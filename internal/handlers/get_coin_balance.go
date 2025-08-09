@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/avukadin/goapi/api"
-	"github.com/avukadin/goapi/internal/tools"
-	log "github.com/sirupsen/logrus"
 	"github.com/gorilla/schema"
+	"github.com/samdandy/go_card_api/api"
+	"github.com/samdandy/go_card_api/internal/tools"
+	log "github.com/sirupsen/logrus"
 )
 
 func GetCoinBalance(w http.ResponseWriter, r *http.Request) {
@@ -39,8 +39,8 @@ func GetCoinBalance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var response = api.CoinBalanceResponse{
-		Balance: (*tokenDetails).Coins,
-		Code:    http.StatusOK,
+		Balance:    (*tokenDetails).Coins,
+		StatusCode: http.StatusOK,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
