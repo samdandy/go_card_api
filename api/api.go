@@ -5,13 +5,14 @@ import (
 	"net/http"
 )
 
-type CoinBalanceParams struct {
-	Username string
+type CardAPIParams struct {
+	SearchCrit string
 }
 
-type CoinBalanceResponse struct {
-	StatusCode int
-	Balance    int64
+type CardAvgPrice struct {
+	StatusCode   int
+	AveragePrice float64
+	CardPrices   []float64
 }
 
 type ErrorResponse struct {
