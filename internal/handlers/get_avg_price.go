@@ -12,6 +12,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gorilla/schema"
 	"github.com/samdandy/go_card_api/api"
+	db_tools "github.com/samdandy/go_card_api/internal/tools"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -77,9 +78,7 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 	var params = api.CardAPIParams{}
 	var decoder *schema.Decoder = schema.NewDecoder()
 	var err error
-
 	err = decoder.Decode(&params, r.URL.Query())
-
 	if err != nil {
 		log.Error(err)
 		api.InternalErrorHandler(w)
@@ -87,7 +86,8 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 	}
 	search := params.SearchCrit
 	search = strings.ReplaceAll(search, " ", "+")
-	html_data, err := fetch_html("https://www.ebay.com/sch/i.html?_nkw=" + search + "&LH_Complete=1&LH_Sold=1")
+	html_data, err := fetch_html("https://www.ebay.com/sch/i.html?_nkw=" + search + "&_sacat=64482&LH_Complete=1&LH_Sold=1")
+	fmt.Println("Fetching URL:", "https://www.ebay.com/sch/i.html?_nkw="+search+"&_sacat=64482&LH_Complete=1&LH_Sold=1")
 	if err != nil {
 		log.Error(err)
 		api.InternalErrorHandler(w)
@@ -95,7 +95,6 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 	}
 	defer html_data.Close()
 	avg_price, prices := parse_html(html_data)
-
 	var response = api.CardAvgPrice{
 		AveragePrice: avg_price,
 		StatusCode:   http.StatusOK,
@@ -104,10 +103,13 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(response)
+
 	if err != nil {
 		log.Error(err)
 		api.InternalErrorHandler(w)
 		return
 	}
+
+	go db_tools.DB.WriteCardSearchLog(search, int64(len(prices)))
 
 }

@@ -1,31 +1,79 @@
 package tools
 
 import (
-	log "github.com/sirupsen/logrus"
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
+
+	_ "github.com/lib/pq"
 )
 
-type LoginDetails struct {
-	AuthToken string
-	Username  string
+type Card struct {
+	Name  string
+	Price int64
 }
 
-type CoinDetails struct {
-	Coins    int64
-	Username string
+type PGDatabase struct {
+	db *sql.DB
 }
 
-type DatabaseInterface interface {
-	GetUserLoginDetails(username string) *LoginDetails
-	GetUserCoins(username string) *CoinDetails
-	SetupDatabase() error
+type Database interface {
+	InitDB() error
+	FlushTable(tableName string) error
+	WriteCardSearchLog(searchCrit string, resultCount int64) error
+	Close() error
 }
 
-func NewDatabase() (*DatabaseInterface, error) {
-	var database DatabaseInterface = &mockDB{}
-	var err error = database.SetupDatabase()
-	if err != nil {
-		log.Error(err)
-		return nil, err
+var DB *PGDatabase
+
+func Init() {
+	DB = &PGDatabase{}
+	if err := DB.InitDB(); err != nil {
+		log.Fatalf("Failed to init DB: %v", err)
 	}
-	return &database, nil
+}
+
+func (p *PGDatabase) InitDB() error {
+	host := os.Getenv("PG_HOST")
+	port := os.Getenv("PG_PORT")
+	user := os.Getenv("PG_USER")
+	password := os.Getenv("PG_PASSWORD")
+	dbname := os.Getenv("PG_DBNAME")
+	sslmode := os.Getenv("PG_SSLMODE")
+	if port == "" {
+		port = "5432"
+	}
+	if sslmode == "" {
+		sslmode = "disable"
+	}
+	connStr := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode,
+	)
+	var err error
+	p.db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		return err
+	}
+	return p.db.Ping()
+}
+
+func (p *PGDatabase) FlushTable(tableName string) error {
+	query := fmt.Sprintf("DELETE FROM logger.%s;", tableName)
+	_, err := p.db.Exec(query)
+	return err
+}
+
+func (p *PGDatabase) WriteCardSearchLog(searchCrit string, resultCount int64) error {
+	query := "INSERT INTO logger.card_search_log (search_term, result_count) VALUES ($1, $2)"
+	_, err := p.db.Exec(query, searchCrit, resultCount)
+	return err
+}
+
+func (p *PGDatabase) Close() error {
+	if p.db != nil {
+		return p.db.Close()
+	}
+	return nil
 }
