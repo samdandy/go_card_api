@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	_ "github.com/lib/pq"
 )
@@ -18,23 +19,18 @@ type PGDatabase struct {
 	db *sql.DB
 }
 
-type Database interface {
-	InitDB() error
-	FlushTable(tableName string) error
-	WriteCardSearchLog(searchCrit string, resultCount int64) error
-	Close() error
-}
-
 var DB *PGDatabase
 
-func Init() {
+func Init() error {
 	DB = &PGDatabase{}
-	if err := DB.InitDB(); err != nil {
+	if err := DB.Connect(); err != nil {
 		log.Fatalf("Failed to init DB: %v", err)
+		return err
 	}
+	return nil
 }
 
-func (p *PGDatabase) InitDB() error {
+func (p *PGDatabase) Connect() error {
 	host := os.Getenv("PG_HOST")
 	port := os.Getenv("PG_PORT")
 	user := os.Getenv("PG_USER")
@@ -59,9 +55,11 @@ func (p *PGDatabase) InitDB() error {
 	return p.db.Ping()
 }
 
-func (p *PGDatabase) FlushTable(tableName string) error {
+func (p *PGDatabase) FlushTable(tableName string, wg *sync.WaitGroup) error {
+	defer wg.Done()
 	query := fmt.Sprintf("DELETE FROM logger.%s;", tableName)
 	_, err := p.db.Exec(query)
+	fmt.Printf("Flushing table %s\n", tableName)
 	return err
 }
 
