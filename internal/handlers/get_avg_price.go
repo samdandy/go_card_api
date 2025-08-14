@@ -59,7 +59,6 @@ func parse_html(r io.Reader) (float64, []api.Card) {
 		image_urls = append(image_urls, image_url)
 	})
 	doc.Find(".s-item__price").Each(func(i int, s *goquery.Selection) {
-		fmt.Println("Found price:", s.Text())
 		text := strings.TrimSpace(s.Text())
 
 		// Remove $ and commas
@@ -97,11 +96,9 @@ func CleanseCards(cards []api.Card) []api.Card {
 
 	for _, card := range cards {
 		if !ValidCardTitle(card.ListingTitle) {
-			fmt.Println("Skipping invalid card:", card.ListingTitle)
 			continue
 		}
 		if card.Price <= 0 {
-			fmt.Println("Skipping card with non-positive price:", card.ListingTitle, "Price:", card.Price)
 			continue
 		}
 		cleanedCards = append(cleanedCards, card)
@@ -119,7 +116,6 @@ func ValidCardTitle(title string) bool {
 	titleLower := strings.ToLower(title)
 	for _, phrase := range unwantedPhrases {
 		if strings.Contains(titleLower, phrase) {
-			fmt.Println("Invalid card title:", title)
 			return false
 		}
 	}
@@ -162,7 +158,6 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 		api.InternalErrorHandler(w)
 		return
 	}
-
-	go db_tools.DB.WriteCardSearchLog(search, int64(len(cards)))
-
+	db_tools.DB.WriteCardSearchLog(search, int64(len(cards)), nil)
+	db_tools.DB.ReadCardSearchLog(nil)
 }

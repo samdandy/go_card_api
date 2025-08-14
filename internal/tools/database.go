@@ -10,11 +10,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type Card struct {
-	Name  string
-	Price int64
-}
-
 type PGDatabase struct {
 	db *sql.DB
 }
@@ -55,15 +50,17 @@ func (p *PGDatabase) Connect() error {
 	return p.db.Ping()
 }
 
-func (p *PGDatabase) FlushTable(tableName string, wg *sync.WaitGroup) error {
-	defer wg.Done()
+func (p *PGDatabase) FlushTable(tableName string) error {
 	query := fmt.Sprintf("DELETE FROM logger.%s;", tableName)
 	_, err := p.db.Exec(query)
 	fmt.Printf("Flushing table %s\n", tableName)
 	return err
 }
 
-func (p *PGDatabase) WriteCardSearchLog(searchCrit string, resultCount int64) error {
+func (p *PGDatabase) WriteCardSearchLog(searchCrit string, resultCount int64, wg *sync.WaitGroup) error {
+	if wg != nil {
+		defer wg.Done()
+	}
 	query := "INSERT INTO logger.card_search_log (search_term, result_count) VALUES ($1, $2)"
 	_, err := p.db.Exec(query, searchCrit, resultCount)
 	return err
@@ -74,4 +71,27 @@ func (p *PGDatabase) Close() error {
 		return p.db.Close()
 	}
 	return nil
+}
+
+func (p *PGDatabase) ReadCardSearchLog(wg *sync.WaitGroup) {
+	if wg != nil {
+		defer wg.Done()
+	}
+	query := "SELECT search_term, result_count FROM logger.card_search_log"
+	rows, err := p.db.Query(query)
+	if err != nil {
+		log.Println("Error reading card search log:", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var searchTerm string
+		var resultCount int64
+		if err := rows.Scan(&searchTerm, &resultCount); err != nil {
+			log.Println("Error scanning row:", err)
+			continue
+		}
+		fmt.Printf("Search Term: %s, Result Count: %d\n", searchTerm, resultCount)
+	}
 }

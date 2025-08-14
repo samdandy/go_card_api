@@ -13,10 +13,12 @@ import (
 )
 
 func StartUpTasks() {
-	cleanup_wg := sync.WaitGroup{}
-	cleanup_wg.Add(1)
-	go db_tools.DB.FlushTable("card_search_log", &cleanup_wg)
-	cleanup_wg.Wait()
+	fmt.Println("Running startup tasks...")
+	var once sync.Once
+	once.Do(func() {
+		db_tools.DB.FlushTable("card_search_log")
+	})
+	fmt.Println("Startup tasks completed.")
 }
 
 func main() {
