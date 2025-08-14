@@ -16,23 +16,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// func validCardCheck(title string) bool {
-// 	unwantedPhrases := []string{
-// 		"shop on ebay",
-// 		"see more like this",
-// 		"sponsored",
-// 		"advertisement",
-// 	}
-// 	titleLower := strings.ToLower(title)
-// 	for _, phrase := range unwantedPhrases {
-// 		if strings.Contains(titleLower, phrase) {
-// 			fmt.Println("Invalid card title:", title)
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
-
 func fetch_html(url_str string) (io.ReadCloser, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -62,7 +45,6 @@ func parse_html(r io.Reader) (float64, []api.Card) {
 	if err != nil {
 		log.Fatal("Error reading response body:", err)
 	}
-
 	var cards []api.Card
 	var sum float64
 	var prices []float64
@@ -95,8 +77,6 @@ func parse_html(r io.Reader) (float64, []api.Card) {
 			sum += f
 		}
 	})
-	fmt.Println("Found prices:", titles)
-	fmt.Println("Found image URLs:", image_urls)
 	if len(prices) > 0 {
 		var averagePrice float64 = sum / float64(len(prices))
 		for i := range prices {
@@ -109,6 +89,41 @@ func parse_html(r io.Reader) (float64, []api.Card) {
 		return averagePrice, cards
 	}
 	return 0, cards
+}
+
+func CleanseCards(cards []api.Card) []api.Card {
+
+	var cleanedCards []api.Card
+
+	for _, card := range cards {
+		if !ValidCardTitle(card.ListingTitle) {
+			fmt.Println("Skipping invalid card:", card.ListingTitle)
+			continue
+		}
+		if card.Price <= 0 {
+			fmt.Println("Skipping card with non-positive price:", card.ListingTitle, "Price:", card.Price)
+			continue
+		}
+		cleanedCards = append(cleanedCards, card)
+	}
+	return cleanedCards
+}
+
+func ValidCardTitle(title string) bool {
+	unwantedPhrases := []string{
+		"shop on ebay",
+		"see more like this",
+		"sponsored",
+		"advertisement",
+	}
+	titleLower := strings.ToLower(title)
+	for _, phrase := range unwantedPhrases {
+		if strings.Contains(titleLower, phrase) {
+			fmt.Println("Invalid card title:", title)
+			return false
+		}
+	}
+	return true
 }
 
 func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
@@ -132,6 +147,7 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 	}
 	defer html_data.Close()
 	avg_price, cards := parse_html(html_data)
+	cards = CleanseCards(cards)
 	var response = api.CardSearchResponse{
 		AveragePrice: avg_price,
 		StatusCode:   http.StatusOK,
