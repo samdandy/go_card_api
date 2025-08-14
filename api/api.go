@@ -5,6 +5,12 @@ import (
 	"net/http"
 )
 
+type Card struct {
+	ListingTitle string
+	Price        float64
+	ImageURL     string
+}
+
 type CardAPIParams struct {
 	SearchCrit string
 }
@@ -13,6 +19,12 @@ type CardAvgPrice struct {
 	StatusCode   int
 	AveragePrice float64
 	CardPrices   []float64
+}
+
+type CardSearchResponse struct {
+	StatusCode   int
+	AveragePrice float64
+	Cards        []Card
 }
 
 type ErrorResponse struct {

@@ -16,6 +16,23 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// func validCardCheck(title string) bool {
+// 	unwantedPhrases := []string{
+// 		"shop on ebay",
+// 		"see more like this",
+// 		"sponsored",
+// 		"advertisement",
+// 	}
+// 	titleLower := strings.ToLower(title)
+// 	for _, phrase := range unwantedPhrases {
+// 		if strings.Contains(titleLower, phrase) {
+// 			fmt.Println("Invalid card title:", title)
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
+
 func fetch_html(url_str string) (io.ReadCloser, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -40,16 +57,27 @@ func fetch_html(url_str string) (io.ReadCloser, error) {
 	return resp.Body, nil // Don't close here — caller will close
 }
 
-func parse_html(r io.Reader) (float64, []float64) {
+func parse_html(r io.Reader) (float64, []api.Card) {
 	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
 		log.Fatal("Error reading response body:", err)
 	}
 
-	var prices []float64
+	var cards []api.Card
 	var sum float64
-
+	var prices []float64
+	var titles []string
+	var image_urls []string
+	doc.Find(".s-item__title").Each(func(i int, s *goquery.Selection) {
+		title := strings.TrimSpace(s.Text())
+		titles = append(titles, title)
+	})
+	doc.Find(".s-item img").Each(func(i int, s *goquery.Selection) {
+		image_url, _ := s.Attr("src")
+		image_urls = append(image_urls, image_url)
+	})
 	doc.Find(".s-item__price").Each(func(i int, s *goquery.Selection) {
+		fmt.Println("Found price:", s.Text())
 		text := strings.TrimSpace(s.Text())
 
 		// Remove $ and commas
@@ -67,11 +95,20 @@ func parse_html(r io.Reader) (float64, []float64) {
 			sum += f
 		}
 	})
-
+	fmt.Println("Found prices:", titles)
+	fmt.Println("Found image URLs:", image_urls)
 	if len(prices) > 0 {
-		return sum / float64(len(prices)), prices
+		var averagePrice float64 = sum / float64(len(prices))
+		for i := range prices {
+			cards = append(cards, api.Card{
+				ListingTitle: titles[i],
+				Price:        prices[i],
+				ImageURL:     image_urls[i],
+			})
+		}
+		return averagePrice, cards
 	}
-	return 0, prices
+	return 0, cards
 }
 
 func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
@@ -94,11 +131,11 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer html_data.Close()
-	avg_price, prices := parse_html(html_data)
-	var response = api.CardAvgPrice{
+	avg_price, cards := parse_html(html_data)
+	var response = api.CardSearchResponse{
 		AveragePrice: avg_price,
 		StatusCode:   http.StatusOK,
-		CardPrices:   prices,
+		Cards:        cards,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -110,6 +147,6 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go db_tools.DB.WriteCardSearchLog(search, int64(len(prices)))
+	go db_tools.DB.WriteCardSearchLog(search, int64(len(cards)))
 
 }
