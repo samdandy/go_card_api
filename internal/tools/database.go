@@ -66,6 +66,23 @@ func (p *PGDatabase) WriteCardSearchLog(searchCrit string, resultCount int64, wg
 	return err
 }
 
+func (p *PGDatabase) CheckUserExists(userName string) (bool, error) {
+	var exists bool
+	query := "SELECT EXISTS(SELECT 1 FROM card.user WHERE username=$1)"
+	err := p.db.QueryRow(query, userName).Scan(&exists)
+	return exists, err
+}
+
+func (p *PGDatabase) CreateUser(username string, password string) (int, error) {
+	query := "INSERT INTO card.user (username, pw) VALUES ($1, $2) RETURNING id"
+	var userID int
+	err := p.db.QueryRow(query, username, password).Scan(&userID)
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
+}
+
 func (p *PGDatabase) Close() error {
 	if p.db != nil {
 		return p.db.Close()
