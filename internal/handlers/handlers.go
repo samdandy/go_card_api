@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi"
 	chimiddle "github.com/go-chi/chi/middleware"
-	user "github.com/samdandy/go_card_api/authentication"
+	user "github.com/samdandy/go_card_api/auth"
 	db_tools "github.com/samdandy/go_card_api/internal/tools"
 )
 
