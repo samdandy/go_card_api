@@ -135,7 +135,6 @@ func GetAvgPrice(w http.ResponseWriter, r *http.Request) {
 	search := params.SearchCrit
 	search = strings.ReplaceAll(search, " ", "+")
 	html_data, err := fetch_html("https://www.ebay.com/sch/i.html?_nkw=" + search + "&_sacat=64482&LH_Complete=1&LH_Sold=1")
-	fmt.Println("Fetching URL:", "https://www.ebay.com/sch/i.html?_nkw="+search+"&_sacat=64482&LH_Complete=1&LH_Sold=1")
 	if err != nil {
 		log.Error(err)
 		api.InternalErrorHandler(w)

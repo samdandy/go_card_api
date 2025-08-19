@@ -83,6 +83,13 @@ func (p *PGDatabase) CreateUser(username string, password string) (int, error) {
 	return userID, nil
 }
 
+func (p *PGDatabase) GetUserPassword(username string) (string, error) {
+	var password string
+	query := "SELECT pw FROM card.user WHERE username=$1"
+	err := p.db.QueryRow(query, username).Scan(&password)
+	return password, err
+}
+
 func (p *PGDatabase) Close() error {
 	if p.db != nil {
 		return p.db.Close()

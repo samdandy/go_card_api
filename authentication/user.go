@@ -4,15 +4,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	db_tools "github.com/samdandy/go_card_api/internal/tools"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var jwtKey = []byte(os.Getenv("JWT_SECRET"))
 
 type User struct {
 	ID       int
 	Username string
 	Password string
+}
+
+type Claims struct {
+	Username string `json:"username"`
+	jwt.RegisteredClaims
 }
 
 type UserSignupRequest struct {
@@ -66,30 +76,60 @@ func UserSignup(w http.ResponseWriter, r *http.Request, db *db_tools.PGDatabase)
 }
 
 func UserLogin(w http.ResponseWriter, r *http.Request, db *db_tools.PGDatabase) {
-
+	var creds User
+	_ = json.NewDecoder(r.Body).Decode(&creds)
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	var req UserLoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	exists, err := db.CheckUserExists(req.Username)
+	pw, err := db.GetUserPassword(creds.Username)
 	if err != nil {
-		http.Error(w, "error checking user existence", http.StatusInternalServerError)
+		http.Error(w, "error getting user password", http.StatusInternalServerError)
 		return
 	}
-	if !exists {
-		http.Error(w, "user not found", http.StatusNotFound)
+	if err := bcrypt.CompareHashAndPassword([]byte(pw), []byte(creds.Password)); err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+	// create JWT
+	expiration := time.Now().Add(1 * time.Hour)
+	claims := &Claims{
+		Username: creds.Username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiration),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		http.Error(w, "Could not login", http.StatusInternalServerError)
 		return
 	}
 
-	// Here you would typically compare the hashed password with the stored hash
-	// For simplicity, we're just going to return a success message
-	fmt.Println("User logged in:", req.Username)
-	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+}
+
+func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Missing token", http.StatusUnauthorized)
+			return
+		}
+
+		var tokenStr string
+		fmt.Sscanf(authHeader, "Bearer %s", &tokenStr)
+
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(tokenStr, claims, func(t *jwt.Token) (interface{}, error) {
+			return jwtKey, nil
+		})
+
+		if err != nil || !token.Valid {
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	}
 }

@@ -14,14 +14,14 @@ func Handler(r *chi.Mux) {
 	fmt.Println("Initializing handlers...")
 	r.Use(chimiddle.StripSlashes)
 	r.Route("/avg_price", func(router chi.Router) {
-		router.Get("/", GetAvgPrice)
+		router.Get("/", user.AuthMiddleware(GetAvgPrice))
 	})
-	// r.Route("/user/login", func(router chi.Router) {
-	// 	router.Post("/", UserLogin)
-	// })
 	r.Route("/user", func(router chi.Router) {
 		router.Post("/signup", func(w http.ResponseWriter, r *http.Request) {
 			user.UserSignup(w, r, db_tools.DB)
+		})
+		router.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+			user.UserLogin(w, r, db_tools.DB)
 		})
 	})
 
